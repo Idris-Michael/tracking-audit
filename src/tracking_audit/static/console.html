@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Audit Desk</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root {
+  --paper: #f5f3ee; --panel: #fffefa; --ink: #17181c; --muted: #676a72; --rule: #e1ded6;
+  --accent: #23466e; --accent-ink: #f2f6fb; --focus: #3a6ea8;
+  --pass: #1f6b4a; --pass-bg: #e3f0e8; --warn: #8a5a00; --warn-bg: #f8ecd2;
+  --fail: #a3261f; --fail-bg: #f7e1de; --unk: #5d6068; --unk-bg: #ebe9e4;
+  --sans: "Instrument Sans", system-ui, sans-serif; --mono: "JetBrains Mono", ui-monospace, monospace;
+}
+@media (prefers-color-scheme: dark) {
+  :root { --paper: #121418; --panel: #1a1d22; --ink: #e8e6e1; --muted: #9a9ca3; --rule: #2c3037;
+    --accent: #8db4e2; --accent-ink: #0d1824; --focus: #a8c8ee;
+    --pass: #7fd0a8; --pass-bg: #16291f; --warn: #f0c060; --warn-bg: #2c2412;
+    --fail: #f08a80; --fail-bg: #331a18; --unk: #b0b2b8; --unk-bg: #24272d; }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--paper); color: var(--ink); font: 15px/1.5 var(--sans); }
+button, input, textarea { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
+header { display: flex; align-items: baseline; gap: 24px; padding: 18px 28px 12px; border-bottom: 1px solid var(--rule); flex-wrap: wrap; }
+h1 { font-size: 22px; letter-spacing: -0.02em; margin: 0; }
+h1 small { font-weight: 400; color: var(--muted); font-size: 14px; margin-left: 8px; }
+.stats { display: flex; gap: 26px; margin-left: auto; flex-wrap: wrap; }
+.stat b { display: block; font: 600 22px/1.1 var(--mono); }
+.stat span { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+main { display: grid; grid-template-columns: minmax(300px, 400px) 1fr; min-height: calc(100vh - 76px); }
+@media (max-width: 860px) { main { grid-template-columns: 1fr; } nav { max-height: none; border-right: 0; } }
+nav { border-right: 1px solid var(--rule); overflow-y: auto; max-height: calc(100vh - 76px); }
+form.new { padding: 16px; border-bottom: 1px solid var(--rule); display: grid; gap: 8px; }
+form.new label { font-size: 12px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+textarea, input[type=text], input[type=password] { width: 100%; border: 1px solid var(--rule); border-radius: 8px; background: var(--panel); padding: 9px 11px; }
+textarea { min-height: 92px; resize: vertical; font: 13px/1.5 var(--mono); }
+.row { display: flex; gap: 8px; }
+.btn { border: 1px solid var(--accent); background: var(--accent); color: var(--accent-ink); border-radius: 8px; padding: 8px 16px; cursor: pointer; font-weight: 600; white-space: nowrap; }
+.btn.ghost { background: transparent; color: var(--accent); }
+.btn:hover { filter: brightness(1.08); }
+.note { font-size: 13px; color: var(--muted); margin: 0; min-height: 1.2em; }
+.note.bad { color: var(--fail); }
+ul.queue { list-style: none; margin: 0; padding: 0; }
+.queue button { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; width: 100%; text-align: left; padding: 11px 16px; border: 0; border-bottom: 1px solid var(--rule); background: transparent; cursor: pointer; }
+.queue button:hover { background: var(--panel); }
+.queue button[aria-current="true"] { background: var(--panel); box-shadow: inset 3px 0 0 var(--accent); }
+.host { font-weight: 600; overflow-wrap: anywhere; }
+.num { font: 600 15px var(--mono); }
+.meta { grid-column: 1 / -1; font-size: 12px; color: var(--muted); display: flex; gap: 8px; align-items: center; }
+.pips { display: flex; gap: 2px; grid-column: 1 / -1; }
+.pips i { flex: 1; height: 3px; border-radius: 1px; background: var(--rule); }
+.pips i.on { background: var(--accent); }
+.chip { font: 500 11px var(--mono); padding: 1px 8px; border-radius: 4px; text-transform: uppercase; letter-spacing: 0.05em; background: var(--unk-bg); color: var(--unk); }
+.chip.pass, .chip.done { background: var(--pass-bg); color: var(--pass); }
+.chip.warn, .chip.running, .chip.queued { background: var(--warn-bg); color: var(--warn); }
+.chip.fail, .chip.failed { background: var(--fail-bg); color: var(--fail); }
+section.detail { padding: 26px 34px 60px; max-width: 1040px; }
+.empty { color: var(--muted); padding: 60px 34px; max-width: 520px; }
+.title { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; }
+.title h2 { margin: 0; font-size: 28px; letter-spacing: -0.02em; overflow-wrap: anywhere; }
+.big { font: 600 40px/1 var(--mono); }
+.big small { font-size: 16px; color: var(--muted); }
+.sub { color: var(--muted); font-size: 13px; margin: 6px 0 18px; overflow-wrap: anywhere; }
+table { width: 100%; border-collapse: collapse; background: var(--panel); border: 1px solid var(--rule); border-radius: 10px; overflow: hidden; }
+th, td { text-align: left; padding: 10px 14px; border-bottom: 1px solid var(--rule); vertical-align: top; font-size: 14px; }
+th { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 500; }
+tr:last-child td { border-bottom: 0; }
+td:first-child { font-weight: 600; width: 26%; }
+.actions { display: flex; gap: 10px; margin: 18px 0; flex-wrap: wrap; }
+.error { background: var(--fail-bg); color: var(--fail); border-radius: 10px; padding: 14px 16px; }
+iframe { width: 100%; height: 1100px; border: 1px solid var(--rule); border-radius: 10px; background: #fff; margin-top: 8px; }
+.signin { max-width: 380px; margin: 12vh auto; display: grid; gap: 10px; padding: 0 16px; }
+.signin p { color: var(--muted); margin: 0; }
+@media (max-width: 640px) { header, section.detail { padding-left: 16px; padding-right: 16px; } .stats { gap: 16px; } }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<template id="t-signin">
+  <form class="signin">
+    <h1>Audit Desk</h1>
+    <p>Tracking audits for prospect sites. Enter the API token to continue.</p>
+    <label for="token">API token</label>
+    <input id="token" type="password" autocomplete="off" required>
+    <button class="btn" type="submit">Sign in</button>
+    <p class="note" role="status"></p>
+  </form>
+</template>
+<template id="t-main">
+  <header>
+    <h1>Audit Desk <small>one page load per site, before consent</small></h1>
+    <div class="stats" aria-live="polite"></div>
+  </header>
+  <main>
+    <nav aria-label="Audits">
+      <form class="new">
+        <label for="targets">Sites to audit, one per line</label>
+        <textarea id="targets" placeholder="https://shop.example/&#10;another-shop.example" required></textarea>
+        <div class="row">
+          <input id="batch" type="text" placeholder="Batch name (optional)" aria-label="Batch name">
+          <button class="btn" type="submit">Audit</button>
+        </div>
+        <p class="note" role="status"></p>
+      </form>
+      <ul class="queue"></ul>
+    </nav>
+    <section class="detail" aria-live="polite"></section>
+  </main>
+</template>
+<script>
+"use strict";
+const $ = (sel, root = document) => root.querySelector(sel);
+const el = (tag, cls, text) => { const n = document.createElement(tag); if (cls) n.className = cls; if (text != null) n.textContent = text; return n; };
+let token = sessionStorage.getItem("ta-token") || "";
+let selected = null, blobUrl = null;
+
+async function api(path, opts = {}) {
+  const res = await fetch(path, { ...opts, headers: { authorization: `Bearer ${token}`, "content-type": "application/json", ...(opts.headers || {}) } });
+  if (res.status === 401) { sessionStorage.removeItem("ta-token"); token = ""; render(); throw new Error("signed out"); }
+  return res;
+}
+const hostOf = (u) => { try { return new URL(u).hostname.replace(/^www\./, ""); } catch { return u; } };
+
+function signin() {
+  const app = $("#app"); app.replaceChildren($("#t-signin").content.cloneNode(true));
+  $("form", app).addEventListener("submit", async (e) => {
+    e.preventDefault(); token = $("#token").value.trim();
+    const res = await fetch("/v1/stats", { headers: { authorization: `Bearer ${token}` } });
+    if (res.ok) { sessionStorage.setItem("ta-token", token); render(); }
+    else { const n = $(".note", app); n.textContent = "That token was not accepted."; n.classList.add("bad"); }
+  });
+}
+
+function pips(score) { const p = el("span", "pips"); for (let i = 0; i < 10; i++) p.append(el("i", i < (score ?? 0) ? "on" : "")); return p; }
+
+async function refresh() {
+  if (!token) return;
+  const [audits, stats] = await Promise.all([api("/v1/audits?limit=200").then((r) => r.json()), api("/v1/stats").then((r) => r.json())]);
+  const s = $(".stats"); s.replaceChildren();
+  const by = stats.by_status || {};
+  for (const [label, value] of [["queued", (by.queued || 0) + (by.running || 0)], ["audited", by.done || 0], ["could not audit", by.failed || 0], ["median score", stats.median_score ?? "–"]]) {
+    const d = el("div", "stat"); d.append(el("b", null, String(value)), el("span", null, label)); s.append(d);
+  }
+  const ul = $(".queue"); ul.replaceChildren();
+  for (const a of audits) {
+    const b = el("button"); b.type = "button"; if (a.id === selected) b.setAttribute("aria-current", "true");
+    b.append(el("span", "host", hostOf(a.target)), el("span", "num", a.score != null ? `${a.score}/10` : ""));
+    const m = el("span", "meta"); m.append(el("span", `chip ${a.status}`, a.status === "failed" ? "could not audit" : a.status));
+    if (a.seconds != null) m.append(el("span", null, `${a.seconds}s`));
+    b.append(m); if (a.score != null) b.append(pips(a.score));
+    b.addEventListener("click", () => { selected = a.id; show(a.id); refresh(); });
+    const li = el("li"); li.append(b); ul.append(li);
+  }
+  if (selected && audits.some((a) => a.id === selected && ["queued", "running"].includes(a.status))) show(selected);
+}
+
+async function show(id) {
+  const a = await api(`/v1/audits/${id}`).then((r) => r.json());
+  const d = $(".detail"); d.replaceChildren();
+  const t = el("div", "title"); t.append(el("h2", null, hostOf(a.target)));
+  if (a.score != null) { const big = el("span", "big", String(a.score)); big.append(el("small", null, "/10")); t.append(big); }
+  t.append(el("span", `chip ${a.status}`, a.status === "failed" ? "could not audit" : a.status));
+  d.append(t, el("p", "sub", `${a.target}${a.finished_at ? " · finished " + a.finished_at.slice(0, 16).replace("T", " ") + " UTC" : ""}`));
+  if (a.error) { d.append(el("p", "error", a.error)); return; }
+  if (!a.report) { d.append(el("p", "note", "Waiting for a worker. One page load takes a few seconds.")); return; }
+  const tbl = el("table"); const head = el("tr");
+  for (const h of ["Check", "Result", "Finding"]) head.append(el("th", null, h));
+  const thead = el("thead"); thead.append(head); const body = el("tbody"); tbl.append(thead, body);
+  const label = { pass: "Pass", warn: "Warning", fail: "Fail", unknown: "Not visible" };
+  for (const c of a.report.checks) { const tr = el("tr"); const st = el("td"); st.append(el("span", `chip ${c.status}`, label[c.status])); tr.append(el("td", null, c.name), st, el("td", null, c.detail)); body.append(tr); }
+  d.append(tbl);
+  const act = el("div", "actions");
+  const view = el("button", "btn", "Show prospect scorecard"); view.type = "button";
+  const pdf = el("button", "btn ghost", "Download PDF"); pdf.type = "button";
+  act.append(view, pdf); d.append(act);
+  view.addEventListener("click", async () => {
+    const html = await api(`/v1/audits/${id}/scorecard.html`).then((r) => r.text());
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    blobUrl = URL.createObjectURL(new Blob([html], { type: "text/html" }));
+    const f = el("iframe"); f.title = "Prospect scorecard"; f.setAttribute("sandbox", ""); f.src = blobUrl;
+    $("iframe", d)?.remove(); d.append(f); f.scrollIntoView({ behavior: "smooth" });
+  });
+  pdf.addEventListener("click", async () => {
+    const blob = await api(`/v1/audits/${id}/scorecard.pdf`).then((r) => r.blob());
+    const link = el("a"); link.href = URL.createObjectURL(blob); link.download = `scorecard-${hostOf(a.target)}.pdf`; link.click();
+  });
+}
+
+function main() {
+  const app = $("#app"); app.replaceChildren($("#t-main").content.cloneNode(true));
+  $(".detail").append(el("p", "empty", "Paste one or more prospect sites on the left. Each gets one clean page load and a scorecard you can send."));
+  $("form.new").addEventListener("submit", async (e) => {
+    e.preventDefault(); const note = $("form.new .note"); note.classList.remove("bad");
+    const targets = $("#targets").value.split("\n").map((s) => s.trim()).filter(Boolean);
+    const name = $("#batch").value.trim() || `Batch ${new Date().toISOString().slice(0, 16).replace("T", " ")}`;
+    const res = targets.length === 1
+      ? await api("/v1/audits", { method: "POST", body: JSON.stringify({ target: targets[0] }) })
+      : await api("/v1/batches", { method: "POST", body: JSON.stringify({ name, targets }) });
+    const data = await res.json();
+    if (!res.ok) { note.classList.add("bad"); note.textContent = data.detail?.refused ? data.detail.refused.map((r) => `${r.target}: ${r.reason}`).join("; ") : String(data.detail); return; }
+    note.textContent = `Queued ${targets.length} site${targets.length > 1 ? "s" : ""}.`; $("#targets").value = ""; refresh();
+  });
+  refresh(); setInterval(() => refresh().catch(() => {}), 4000);
+}
+
+function render() { token ? main() : signin(); }
+render();
+</script>
+</body>
+</html>

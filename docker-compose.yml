@@ -1,0 +1,52 @@
+# docker compose up --build      API + worker + Postgres + Jaeger; console at http://localhost:${API_PORT:-8080}
+name: tracking-audit
+
+x-app: &app
+  build: .
+  image: tracking-audit:local
+  env_file: .env
+  environment:
+    DATABASE_URL: postgresql+psycopg://audit:audit@postgres:5432/audit
+    OTEL_EXPORTER_OTLP_ENDPOINT: http://jaeger:4318
+  depends_on:
+    migrate:
+      condition: service_completed_successfully
+
+services:
+  postgres:
+    image: postgres:17-alpine
+    environment:
+      POSTGRES_USER: audit
+      POSTGRES_PASSWORD: audit  # local only; deployed environments read it from Key Vault / Secrets Manager
+      POSTGRES_DB: audit
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U audit"]
+      interval: 3s
+      retries: 20
+    volumes: [pgdata:/var/lib/postgresql/data]
+
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    healthcheck: { disable: true }
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  api:
+    <<: *app
+    command: ["ta-api"]
+    ports: ["${API_PORT:-8080}:8080"]
+
+  worker:
+    <<: *app
+    command: ["ta-worker"]
+    healthcheck: { disable: true }
+    shm_size: 1gb  # Chromium needs more shared memory than Docker's 64 MB default
+
+  jaeger:
+    image: jaegertracing/jaeger:2.11.0
+    ports: ["16686:16686"]  # UI; OTLP (4318) stays on the compose network
+
+volumes:
+  pgdata:

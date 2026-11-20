@@ -107,3 +107,19 @@ class Guard:
     @property
     def blocked_hosts(self) -> list[str]:
         return sorted(h for h, v in self._verdicts.items() if v.startswith(BLOCKED))
+
+
+def precheck(raw: str) -> str:
+    """The checks that need no DNS, for refusing a target at the API before it is queued. The worker
+    still runs the full guard (with resolution) on every connection."""
+    url = normalise(raw)
+    host = urlsplit(url).hostname or ""
+    if blocked_by_name(host):
+        raise BlockedURL(f"blocked local host {host}")
+    try:
+        literal = ipaddress.ip_address(host.strip("[]"))
+    except ValueError:
+        return url
+    if not is_public_ip(str(literal)):
+        raise BlockedURL(f"blocked private address {host}")
+    return url
