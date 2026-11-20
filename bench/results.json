@@ -1,0 +1,110 @@
+{
+  "run1": {
+    "sites": 20,
+    "audited": 8,
+    "refused_automated_browser": 12,
+    "other_errors": 0,
+    "concurrency": 4,
+    "wall_s": 20,
+    "median_s_per_audited_site": 4.4,
+    "scores": {
+      "https://www.cotswoldoutdoor.com/": 7,
+      "https://www.dunelm.com/": 8,
+      "https://www.halfords.com/": 8,
+      "https://www.hobbycraft.co.uk/": 10,
+      "https://www.marksandspencer.com/": 3,
+      "https://www.superdry.com/": 7,
+      "https://uk.gymshark.com/": 10,
+      "https://www.wickes.co.uk/": 7
+    },
+    "check_results": {
+      "Google Tag Manager": {
+        "pass": 6,
+        "fail": 1,
+        "warn": 1
+      },
+      "GA4": {
+        "fail": 3,
+        "warn": 3,
+        "pass": 2
+      },
+      "Consent Mode v2": {
+        "pass": 8
+      },
+      "Meta Pixel": {
+        "unknown": 8
+      },
+      "Meta CAPI (server)": {
+        "unknown": 8
+      }
+    },
+    "refused": [
+      "https://ao.com/",
+      "https://www.argos.co.uk/",
+      "https://www.asos.com/",
+      "https://www.boots.com/",
+      "https://www.currys.co.uk/",
+      "https://www.johnlewis.com/",
+      "https://www.lush.com/uk/en",
+      "https://www.next.co.uk/",
+      "https://www.notonthehighstreet.com/",
+      "https://www.sainsburys.co.uk/",
+      "https://www.screwfix.com/",
+      "https://www.waterstones.com/"
+    ]
+  },
+  "run2": {
+    "sites": 20,
+    "audited": 8,
+    "refused_automated_browser": 12,
+    "other_errors": 0,
+    "concurrency": 4,
+    "wall_s": 18,
+    "median_s_per_audited_site": 4.45,
+    "scores": {
+      "https://www.cotswoldoutdoor.com/": 7,
+      "https://www.dunelm.com/": 10,
+      "https://www.halfords.com/": 8,
+      "https://www.hobbycraft.co.uk/": 8,
+      "https://www.marksandspencer.com/": 5,
+      "https://www.superdry.com/": 10,
+      "https://uk.gymshark.com/": 10,
+      "https://www.wickes.co.uk/": 7
+    },
+    "check_results": {
+      "Google Tag Manager": {
+        "pass": 6,
+        "unknown": 1,
+        "warn": 1
+      },
+      "GA4": {
+        "fail": 2,
+        "pass": 3,
+        "warn": 3
+      },
+      "Consent Mode v2": {
+        "pass": 8
+      },
+      "Meta Pixel": {
+        "unknown": 8
+      },
+      "Meta CAPI (server)": {
+        "unknown": 8
+      }
+    },
+    "refused": [
+      "https://ao.com/",
+      "https://www.argos.co.uk/",
+      "https://www.asos.com/",
+      "https://www.boots.com/",
+      "https://www.currys.co.uk/",
+      "https://www.johnlewis.com/",
+      "https://www.lush.com/uk/en",
+      "https://www.next.co.uk/",
+      "https://www.notonthehighstreet.com/",
+      "https://www.sainsburys.co.uk/",
+      "https://www.screwfix.com/",
+      "https://www.waterstones.com/"
+    ]
+  }
+}
