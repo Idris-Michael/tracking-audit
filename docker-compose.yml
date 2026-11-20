@@ -45,7 +45,7 @@ services:
     shm_size: 1gb  # Chromium needs more shared memory than Docker's 64 MB default
 
   jaeger:
-    image: jaegertracing/jaeger:2.11.0
+    image: jaegertracing/jaeger:2.23.0
     ports: ["16686:16686"]  # UI; OTLP (4318) stays on the compose network
 
 volumes:
