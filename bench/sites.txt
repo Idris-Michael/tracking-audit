@@ -1,0 +1,23 @@
+# The 20 benchmark sites: well-known UK retail homepages, fixed and committed before the first run.
+# John Lewis and Next were already known to refuse automated browsers; they stay in, and count as such.
+# One page load each, nothing clicked or submitted.
+https://www.johnlewis.com/
+https://www.next.co.uk/
+https://www.argos.co.uk/
+https://www.boots.com/
+https://www.asos.com/
+https://www.currys.co.uk/
+https://www.marksandspencer.com/
+https://www.sainsburys.co.uk/
+https://www.screwfix.com/
+https://www.halfords.com/
+https://www.dunelm.com/
+https://www.superdry.com/
+https://www.waterstones.com/
+https://www.lush.com/uk/en
+https://uk.gymshark.com/
+https://ao.com/
+https://www.notonthehighstreet.com/
+https://www.hobbycraft.co.uk/
+https://www.wickes.co.uk/
+https://www.cotswoldoutdoor.com/
