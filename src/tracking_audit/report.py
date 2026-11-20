@@ -13,7 +13,7 @@ from .analyse import Report
 LABELS = {"pass": "Pass", "warn": "Warning", "fail": "Fail", "unknown": "Not visible"}
 DEFAULT_PREPARED_BY = "Fieldnote Digital (fictional agency)"
 
-_env = Environment(
+_env = Environment(  # nosemgrep: direct-use-of-jinja2 -- autoescape is on; tests prove escaping
     loader=PackageLoader("tracking_audit", "templates"),
     autoescape=select_autoescape(["html"]),  # every value on the card came from someone else's page
     trim_blocks=True,

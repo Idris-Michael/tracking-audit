@@ -1,0 +1,7 @@
+# The guard, the proxy and the analysis decide what the auditor can reach and what a prospect is told.
+*                                   @Idris-Michael
+/src/tracking_audit/guard.py        @Idris-Michael
+/src/tracking_audit/proxy.py        @Idris-Michael
+/src/tracking_audit/analyse.py      @Idris-Michael
+/src/tracking_audit/templates/      @Idris-Michael
+/infra/                             @Idris-Michael

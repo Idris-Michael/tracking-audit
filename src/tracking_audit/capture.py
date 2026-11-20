@@ -148,7 +148,8 @@ def refusal_hint(text: str) -> str:
 
 
 # Chromium sends loopback traffic around any proxy unless told not to; the proxy must see it all.
-LAUNCH_ARGS = ["--proxy-bypass-list=<-loopback>"]
+# --disable-dev-shm-usage: containers give /dev/shm 64 MB, too little for Chromium; use /tmp instead.
+LAUNCH_ARGS = ["--proxy-bypass-list=<-loopback>", "--disable-dev-shm-usage"]
 
 
 async def launch(pw: Playwright) -> Browser:

@@ -1,0 +1,126 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Actions are pinned to commit SHAs (tags can be repointed); Dependabot keeps the pins current.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python:
+    name: Lint, types, tests (incl. Postgres via testcontainers)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: astral-sh/setup-uv@d0cc045d04ccac9d8b7881df0226f9e82c39688e # v6
+        with:
+          python-version: "3.12"
+          enable-cache: true
+      - run: uv sync --locked
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run mypy
+      - run: uv run playwright install --with-deps --only-shell chromium
+      - run: uv run pytest  # fails under 80% coverage; Docker on the runner backs the Postgres tests
+
+  infra:
+    name: Terraform (${{ matrix.cloud }})
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        cloud: [azure, aws]
+    defaults:
+      run:
+        working-directory: infra/${{ matrix.cloud }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: hashicorp/setup-terraform@b9cd54a3c349d3f38e8881555d616ced269862dd # v3
+      - run: terraform fmt -check -recursive
+      - run: terraform init -backend=false -input=false
+      - run: terraform validate
+      - uses: terraform-linters/setup-tflint@90f302c255ef959cbfb4bd10581afecdb7ece3e6 # v4
+      - run: tflint --init
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+      - run: tflint --format compact
+      - name: Checkov
+        uses: bridgecrewio/checkov-action@b17b606d6ec72bb8ba5721ad5b7e340b80a9fc39 # v12
+        with:
+          directory: infra/${{ matrix.cloud }}
+          framework: terraform
+          quiet: true
+
+  security:
+    name: Secrets, SAST and SBOM
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+      # The CLI directly, pinned and checksum-verified. (gitleaks-action scans "first commit's
+      # parent..HEAD", which fails on a new repository's first push.)
+      - name: Gitleaks (full history)
+        env:
+          GITLEAKS_VERSION: 8.30.1
+        run: |
+          base="https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}"
+          curl -sSfL -o gitleaks.tar.gz "$base/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
+          curl -sSfL -o checksums.txt "$base/gitleaks_${GITLEAKS_VERSION}_checksums.txt"
+          grep " gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz$" checksums.txt | awk '{print $1"  gitleaks.tar.gz"}' | sha256sum -c -
+          tar xzf gitleaks.tar.gz gitleaks
+          ./gitleaks git . --redact --no-banner --exit-code 1
+      - name: Semgrep
+        run: |
+          docker run --rm -v "$PWD:/src" -w /src semgrep/semgrep \
+            semgrep scan --config p/default --error --metrics=off --exclude .venv
+      - name: SBOM (CycloneDX)
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610 # v0
+        with:
+          format: cyclonedx-json
+          artifact-name: sbom.cdx.json
+
+  container:
+    name: Container smoke test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - name: Stack starts, refuses a private target and audits a public page
+        run: |
+          cp .env.example .env
+          sed -i "s/^API_TOKEN=.*/API_TOKEN=$(openssl rand -hex 32)/" .env
+          docker compose up -d --build --wait api
+          docker compose up -d worker
+          set -a; . ./.env; set +a
+          H="authorization: Bearer $API_TOKEN"
+          code=$(curl -s -o /dev/null -w '%{http_code}' -H "$H" -H 'content-type: application/json'             -d '{"target":"http://169.254.169.254/latest/meta-data/"}' http://127.0.0.1:8080/v1/audits)
+          test "$code" = "422"
+          curl -sf -o queued.json -H "$H" -H 'content-type: application/json'             -d '{"target":"https://example.com/"}' http://127.0.0.1:8080/v1/audits
+          id=$(python3 -c "import json; print(json.load(open('queued.json'))['id'])")
+          for _ in $(seq 1 45); do
+            s=$(curl -sf -H "$H" "http://127.0.0.1:8080/v1/audits/$id")
+            echo "$s" | grep -q '"status":"done"' && break; sleep 2
+          done
+          echo "$s" | head -c 600; echo
+          echo "$s" | grep -q '"status":"done"'
+          curl -sf -o card.pdf -H "$H" "http://127.0.0.1:8080/v1/audits/$id/scorecard.pdf"
+          head -c 4 card.pdf | grep -q '%PDF'
+          test "$(docker compose exec -T worker id -u)" = "10001"
+      - if: failure()
+        run: docker compose logs --no-color | tail -100
+
+  dependency-review:
+    name: Dependency review
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: actions/dependency-review-action@2031cfc080254a8a887f58cffee85186f0e49e48 # v4
+        with:
+          fail-on-severity: high
