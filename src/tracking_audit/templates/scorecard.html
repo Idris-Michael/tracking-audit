@@ -89,7 +89,7 @@
   <section class="method">
     <h2>How this was checked</h2>
     <p>One page load in a clean headless browser, before any cookie banner was accepted: the state Consent Mode has to handle. Results show which tags loaded and what they sent. They say nothing about the quality of the data in GA4 or Meta.</p>
-    <p>Server-side tagging and the Meta Conversions API run on servers, so they cannot be seen from a browser and are not scored. "Not visible" results are left out of the score.</p>
+    <p>A server-side tagging endpoint shows up when the page sends hits to it, but what that server forwards to Google or Meta, and anything sent through the Meta Conversions API, happens on servers and cannot be seen from a browser. "Not visible" results are left out of the score.</p>
   </section>
 
   <footer><span>Prepared by {{ prepared_by }}</span><span>tracking-audit {{ version }}</span></footer>

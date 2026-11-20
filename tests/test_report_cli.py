@@ -31,7 +31,7 @@ def report(**over: object):  # type: ignore[no-untyped-def]
 def test_markdown_states_its_limits_and_keeps_table_cells_intact() -> None:
     md = to_markdown(report())
     assert "before any cookie banner was accepted" in md
-    assert "CAPI cannot be seen from a browser" in md
+    assert "CAPI" in md and "cannot be seen from a browser" in md
     for line in (ln for ln in md.splitlines() if ln.startswith("| ") and not ln.startswith("| :")):
         assert line.count(" | ") == 2, line
 

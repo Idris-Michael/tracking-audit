@@ -50,7 +50,7 @@ Checked {checked_label(report)} UTC · {scored}
 IDs seen: {seen}
 
 Method: one page load in a clean headless browser, before any cookie banner was accepted. \
-Server-side tagging and CAPI cannot be seen from a browser.
+What server-side containers forward, and CAPI, cannot be seen from a browser.
 """
 
 
