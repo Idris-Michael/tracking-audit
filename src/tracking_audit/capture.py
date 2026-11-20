@@ -110,13 +110,13 @@ async def capture_page(
         try:
             res = await page.goto(url, wait_until="load", timeout=NAV_TIMEOUT_MS)
         except PlaywrightError as e:
-            raise CaptureError(f"could not load {url}: {str(e).splitlines()[0]}") from e
+            raise CaptureError(f"could not load {url}: {str(e).splitlines()[0]}{refusal_hint(str(e))}") from e
         if res is None:
             raise CaptureError(f"no response from {url}")
         if res.status >= 400:
             if proxy.blocked:  # the egress proxy answered: a redirect led somewhere private
                 raise CaptureError(f"{url} led to a blocked host ({', '.join(sorted(set(proxy.blocked)))})")
-            raise CaptureError(f"{url} returned HTTP {res.status}")
+            raise CaptureError(f"{url} returned HTTP {res.status}{refusal_hint(str(res.status))}")
         try:
             await page.wait_for_load_state("networkidle", timeout=SETTLE_TIMEOUT_MS)
         except PlaywrightError:
@@ -134,6 +134,17 @@ async def capture_page(
     finally:
         await context.close()
         await proxy.close()
+
+
+REFUSALS = ("403", "429", "ERR_HTTP2_PROTOCOL_ERROR", "ERR_CONNECTION_RESET")
+REFUSAL_HINT = (
+    " (the site likely refuses automated browsers; this tool does not disguise itself, "
+    "so audit this site from a normal browser session or ask the owner to allow-list the auditor)"
+)
+
+
+def refusal_hint(text: str) -> str:
+    return REFUSAL_HINT if any(r in text for r in REFUSALS) else ""
 
 
 # Chromium sends loopback traffic around any proxy unless told not to; the proxy must see it all.

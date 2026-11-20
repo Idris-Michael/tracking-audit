@@ -9,7 +9,7 @@ from __future__ import annotations
 import pytest
 
 from tracking_audit.analyse import analyse
-from tracking_audit.capture import CaptureError, capture
+from tracking_audit.capture import CaptureError, capture, refusal_hint
 from tracking_audit.guard import Guard
 
 from .fixture_site import resolve, serve
@@ -54,3 +54,9 @@ async def test_an_http_error_page_is_not_audited() -> None:
 async def test_a_private_target_is_refused_before_a_page_opens() -> None:
     with pytest.raises(CaptureError, match="blocked"):
         await capture("http://127.0.0.1:3000", guard=Guard(resolve), fixture=serve)
+
+
+def test_refusals_get_a_plain_hint_and_other_errors_do_not() -> None:
+    assert "refuses automated browsers" in refusal_hint("403")
+    assert "refuses automated browsers" in refusal_hint("net::ERR_HTTP2_PROTOCOL_ERROR at https://x/")
+    assert refusal_hint("410") == ""
