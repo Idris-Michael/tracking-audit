@@ -17,9 +17,13 @@ from pydantic import BaseModel, Field
 Status = Literal["pass", "warn", "fail", "unknown"]
 MAX_REQUESTS = 2_000
 
-GA4_HIT = re.compile(
-    r"^https://([a-z0-9-]+\.)?(google-analytics\.com|analytics\.google\.com)/(g/collect|[a-z]/collect)", re.I
-)
+# Any host: server-side tagging sends GA4 to the site's own domain (sgtm.shop.example/g/collect).
+GA4_HIT = re.compile(r"^https://[^/?#]+(/[^?#]*)?/g/collect\?", re.I)
+GOOGLE_HOST = re.compile(r"(^|\.)(google-analytics\.com|analytics\.google\.com)$", re.I)
+OTHER_TAG_MANAGERS = {
+    "tags.tiqcdn.com/utag": "Tealium iQ",
+    "assets.adobedtm.com": "Adobe Experience Platform Tags",
+}
 GA4_TID = re.compile(r"[?&]tid=G-", re.I)
 PIXEL_HIT = re.compile(r"^https://(www\.)?facebook\.com/tr/?\?", re.I)
 GTM_JS = re.compile(r"googletagmanager\.com/gtm\.js", re.I)
@@ -64,6 +68,11 @@ class Report(BaseModel):
     decided: int = Field(description="how many checks the score is over")
 
 
+def sentence(text: str) -> str:
+    """First letter up, rest untouched (str.capitalize would lower-case "GA4" and "Google")."""
+    return text[:1].upper() + text[1:] + "."
+
+
 def uniq(xs: list[str]) -> list[str]:
     return list(dict.fromkeys(x for x in xs if x))
 
@@ -88,6 +97,15 @@ def gtm_check(html: str, requests: list[str]) -> tuple[list[str], Check]:
                 status="warn",
                 detail=f"Container {', '.join(in_html)} is in the HTML but gtm.js never loaded.",
             )
+        others = uniq(
+            [label for marker, label in OTHER_TAG_MANAGERS.items() if any(marker in u for u in requests)]
+        )
+        if others:
+            return ids, Check(
+                name=name,
+                status="unknown",
+                detail=f"No GTM; the site uses {' and '.join(others)}, which this audit does not check.",
+            )
         return ids, Check(name=name, status="fail", detail="No GTM container loaded.")
     if len(loaded) > 1:
         return ids, Check(
@@ -96,6 +114,13 @@ def gtm_check(html: str, requests: list[str]) -> tuple[list[str], Check]:
             detail=f"{len(loaded)} containers load ({', '.join(loaded)}); tags can double-fire.",
         )
     return ids, Check(name=name, status="pass", detail=f"Container {loaded[0]} loads.")
+
+
+def via(hits: list[str]) -> str:
+    """Names first-party collection endpoints, the visible sign of server-side tagging."""
+    hosts = uniq([urlsplit(u).hostname or "" for u in hits])
+    first_party = [h for h in hosts if not GOOGLE_HOST.search(h)]
+    return f", via first-party endpoint {', '.join(first_party)} (server-side tagging)" if first_party else ""
 
 
 def ga4_check(html: str, requests: list[str]) -> tuple[list[str], Check, list[str]]:
@@ -119,7 +144,18 @@ def ga4_check(html: str, requests: list[str]) -> tuple[list[str], Check, list[st
                 ),
                 hits,
             )
-        return ids, Check(name=name, status="fail", detail="No GA4 tag or hit found."), hits
+        return (
+            ids,
+            Check(
+                name=name,
+                status="fail",
+                detail=(
+                    "Nothing from GA4 was seen before consent. Either GA4 is not installed, or it waits "
+                    "for consent (basic mode), which loses the cookieless pings GA4 uses for modelling."
+                ),
+            ),
+            hits,
+        )
     page_views = Counter(param(u, "tid") for u in hits if param(u, "en") == "page_view")
     doubled = [(tid, n) for tid, n in page_views.items() if n > 1]
     if doubled:
@@ -145,7 +181,7 @@ def ga4_check(html: str, requests: list[str]) -> tuple[list[str], Check, list[st
             hits,
         )
     extra = " including page_view" if page_views else ""
-    return ids, Check(name=name, status="pass", detail=f"{fired[0]} sends hits{extra}."), hits
+    return ids, Check(name=name, status="pass", detail=f"{fired[0]} sends hits{extra}{via(hits)}."), hits
 
 
 def consent_defaults(data_layer: list[Any]) -> list[dict[str, Any]]:
@@ -172,7 +208,7 @@ def consent_check(data_layer: list[Any], consent_state: dict[str, Any], ga4_hits
     if any(param(u, "gcd") for u in ga4_hits):
         found.append("GA4 hits carry the gcd consent signal")
     if found:
-        return Check(name="Consent Mode v2", status="pass", detail="; ".join(found).capitalize() + ".")
+        return Check(name="Consent Mode v2", status="pass", detail=sentence("; ".join(found)))
     if defaults or consent_state:
         return Check(
             name="Consent Mode v2",

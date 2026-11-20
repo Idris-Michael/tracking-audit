@@ -14,6 +14,7 @@ from .capture import CaptureError, FixtureFn, capture_page, launch
 from .guard import Guard, Resolver, system_resolver
 
 DEFAULT_CONCURRENCY = 4
+SITE_TIMEOUT_S = 90  # load 30 s + settle 8 s + reads; anything past this is stuck
 
 
 class Outcome(BaseModel):
@@ -38,9 +39,13 @@ async def audit_one(
     """Never raises for a bad site: an unreachable or blocked target is an outcome, not a crash."""
     t0 = time.monotonic()
     try:
-        cap = await capture_page(browser, target, guard=Guard(resolver), fixture=fixture)
+        cap = await asyncio.wait_for(
+            capture_page(browser, target, guard=Guard(resolver), fixture=fixture), SITE_TIMEOUT_S
+        )
     except CaptureError as e:
         return Outcome(target=target, error=str(e), seconds=round(time.monotonic() - t0, 1))
+    except TimeoutError:
+        return Outcome(target=target, error=f"gave up after {SITE_TIMEOUT_S} s", seconds=SITE_TIMEOUT_S)
     return Outcome(
         target=target,
         report=analyse(target, cap),

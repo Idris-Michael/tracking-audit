@@ -154,3 +154,30 @@ def test_requests_beyond_the_cap_are_ignored() -> None:
 def test_param_survives_malformed_urls() -> None:
     assert param("https://a.example/?id=1", "id") == "1"
     assert param("not a url", "id") is None
+
+
+# Regressions found by the hand check against raw network captures (bench/hand_check.md).
+def test_ga4_sent_to_a_first_party_server_side_endpoint_counts_as_ga4() -> None:
+    sgtm = "https://sgtm.shop.example/g/collect?v=2&tid=G-SERVER01&en=page_view&gcd=13p3p3p3p5l1"
+    r = analyse("x", cap(requests=[GTM, sgtm]))
+    assert status(r, "GA4") == "pass"
+    assert "via first-party endpoint sgtm.shop.example (server-side tagging)" in detail(r, "GA4")
+    assert r.ids.ga4 == ["G-SERVER01"]
+
+
+def test_a_second_property_on_a_server_side_endpoint_is_still_counted() -> None:
+    sgtm = "https://sgtm.shop.example/g/collect?v=2&tid=G-SERVER01&en=page_view"
+    r = analyse("x", cap(requests=[ga4("page_view"), sgtm]))
+    assert status(r, "GA4") == "warn"
+    assert "2 GA4 properties" in detail(r, "GA4")
+
+
+def test_a_site_on_another_tag_manager_is_not_failed_for_lacking_gtm() -> None:
+    r = analyse("x", cap(requests=["https://tags.tiqcdn.com/utag/shop/main/prod/utag.js"]))
+    assert status(r, "Google Tag Manager") == "unknown"
+    assert "Tealium iQ" in detail(r, "Google Tag Manager")
+
+
+def test_findings_keep_their_capitals() -> None:
+    r = analyse("x", cap(requests=[ga4("page_view", "&gcd=13l3l3l3l1")]))
+    assert detail(r, "Consent Mode v2") == "GA4 hits carry the gcd consent signal."

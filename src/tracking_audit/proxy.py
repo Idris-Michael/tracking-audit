@@ -24,6 +24,7 @@ log = structlog.get_logger()
 
 ALLOWED_PORTS = frozenset({80, 443})
 CONNECT_TIMEOUT_S = 15
+CLOSE_TIMEOUT_S = 2
 
 
 class EgressProxy:
@@ -31,6 +32,7 @@ class EgressProxy:
         self.guard = guard
         self.blocked: list[str] = []
         self._server: asyncio.Server | None = None
+        self._open: set[asyncio.StreamWriter] = set()  # every socket, so close() can end tunnels
 
     async def start(self) -> str:
         self._server = await asyncio.start_server(self._handle, "127.0.0.1", 0)
@@ -38,12 +40,25 @@ class EgressProxy:
         return f"http://127.0.0.1:{port}"
 
     async def close(self) -> None:
-        if self._server is not None:
-            self._server.close()
-            with contextlib.suppress(Exception):
-                await self._server.wait_closed()
+        """Ends every tunnel, then stops listening. Since Python 3.12 `wait_closed` waits for open
+        connections, and a browser can hold a keep-alive tunnel open indefinitely."""
+        if self._server is None:
+            return
+        self._server.close()
+        for w in list(self._open):
+            w.close()
+        with contextlib.suppress(Exception):
+            await asyncio.wait_for(self._server.wait_closed(), CLOSE_TIMEOUT_S)
 
     async def _handle(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
+        self._open.add(writer)
+        try:
+            await self._serve(reader, writer)
+        finally:
+            self._open.discard(writer)
+            writer.close()
+
+    async def _serve(self, reader: asyncio.StreamReader, writer: asyncio.StreamWriter) -> None:
         try:
             head = await reader.readuntil(b"\r\n\r\n")
         except asyncio.LimitOverrunError:  # the reader caps headers at 64 KiB
@@ -89,7 +104,11 @@ class EgressProxy:
         else:
             kept = [h for h in header_lines if h and not h.lower().startswith(("proxy-", "connection:"))]
             up_writer.write(path_line + "\r\n".join([*kept, "Connection: close", "", ""]).encode("latin-1"))
-        await asyncio.gather(_pipe(reader, up_writer), _pipe(up_reader, writer))
+        self._open.add(up_writer)
+        try:
+            await asyncio.gather(_pipe(reader, up_writer), _pipe(up_reader, writer))
+        finally:
+            self._open.discard(up_writer)
 
 
 async def _pipe(src: asyncio.StreamReader, dst: asyncio.StreamWriter) -> None:
